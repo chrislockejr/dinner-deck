@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dinner Deck</title>
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#2f6f4f">
+  <link rel="icon" href="/static/icons/icon-192.png">
+  <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <header>
+    <h1>🍽️ Dinner Deck</h1>
+    <nav>
+      <button class="tab-btn active" data-tab="plan">This Week</button>
+      <button class="tab-btn" data-tab="recipes">Recipes</button>
+      <button class="tab-btn" data-tab="grocery">Grocery List</button>
+    </nav>
+  </header>
+
+  <main>
+    <!-- PLAN TAB -->
+    <section id="tab-plan" class="tab active">
+      <div class="card">
+        <h2>Generate This Week's Plan (Mon–Fri)</h2>
+        <label>Exclude tags (comma-separated, e.g. shrimp, shellfish)</label>
+        <input type="text" id="exclude-tags-input" placeholder="shrimp, shellfish, peanuts">
+        <button id="generate-plan-btn">Shuffle the Deck</button>
+      </div>
+
+      <div id="plan-meals"></div>
+    </section>
+
+    <!-- RECIPES TAB -->
+    <section id="tab-recipes" class="tab">
+      <div class="card">
+        <h2 id="recipe-form-title">Add a Recipe</h2>
+        <form id="recipe-form">
+          <input type="hidden" id="recipe-id">
+          <label>Name</label>
+          <input type="text" id="recipe-name" required>
+
+          <label>Cuisine</label>
+          <input type="text" id="recipe-cuisine" placeholder="Asian, Tex-Mex, Mediterranean, American..." required>
+
+          <label>Cook time (minutes)</label>
+          <input type="number" id="recipe-cook-time" min="1" max="29" required>
+
+          <label>Base servings</label>
+          <input type="number" id="recipe-servings" min="1" value="4" required>
+
+          <label>Tags (comma-separated)</label>
+          <input type="text" id="recipe-tags" placeholder="chicken, gluten, dairy">
+
+          <label>Ingredients</label>
+          <div id="ingredient-rows"></div>
+          <button type="button" id="add-ingredient-row">+ Add Ingredient</button>
+
+          <label>Instructions</label>
+          <textarea id="recipe-instructions" rows="4" placeholder="1. ...&#10;2. ..."></textarea>
+
+          <div class="form-actions">
+            <button type="submit">Save Recipe</button>
+            <button type="button" id="cancel-edit-btn" style="display:none;">Cancel</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="card">
+        <h2>Recipe Pool</h2>
+        <div class="filter-row">
+          <input type="text" id="recipe-search" placeholder="Search recipes...">
+        </div>
+        <div id="recipe-list" class="recipe-grid"></div>
+      </div>
+    </section>
+
+    <!-- GROCERY TAB -->
+    <section id="tab-grocery" class="tab">
+      <div class="card">
+        <h2>Grocery List</h2>
+        <button id="generate-grocery-btn">Generate from This Week's Plan</button>
+        <p class="muted">Generate while on WiFi at home — the list is cached for offline use at the store.</p>
+      </div>
+      <div id="grocery-items"></div>
+    </section>
+  </main>
+
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
