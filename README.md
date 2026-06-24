@@ -68,19 +68,39 @@ python3 app.py
 
 The app runs on **port 5050** (not 5000 — on macOS, AirPlay Receiver holds port 5000; kill it with `lsof -ti:5000 | xargs kill -9` if you ever want 5000 back). Visit `http://localhost:5050`.
 
+By default `app.py` runs with the Werkzeug dev server in non-debug mode. For local development, enable auto-reload with:
+
+```bash
+FLASK_DEBUG=true python3 app.py
+```
+
+`FLASK_HOST` and `FLASK_DEBUG` are both read from the environment (same pattern as Card Tracker) — `FLASK_HOST` defaults to `0.0.0.0` so the app is reachable from other devices on the network (needed for phone access to the PWA); `FLASK_DEBUG` defaults to `false`.
+
 ## Deploying to a Raspberry Pi
 
-This is intended to run alongside other lightweight Flask apps on a Pi 3 (1GB RAM):
+This runs alongside Card Tracker on a Pi 3 (1GB RAM) as a separate systemd service on a different port (5050 vs. Card Tracker's 5001), so the two can't collide:
 
-1. Clone the repo onto the Pi.
+1. Clone the repo onto the Pi: `git clone https://github.com/chrislockejr/dinner-deck.git ~/dinner-deck`
 2. Create a venv and install `requirements.txt`.
 3. Run the two migration scripts once to seed the database.
-4. Use a production WSGI server instead of the Flask dev server, e.g.:
-   ```bash
-   pip install gunicorn
-   gunicorn -w 2 -b 0.0.0.0:5050 app:app
+4. Create `/etc/systemd/system/dinner-deck.service`:
+   ```ini
+   [Unit]
+   Description=Dinner Deck
+   After=network.target
+
+   [Service]
+   User=chris
+   WorkingDirectory=/home/chris/dinner-deck
+   ExecStart=/home/chris/dinner-deck/venv/bin/python3 app.py
+   Restart=always
+
+   [Install]
+   WantedBy=multi-user.target
    ```
-5. Use a process manager (systemd service or `start.sh` + `nohup`) to keep it running across reboots.
+5. `sudo systemctl daemon-reload && sudo systemctl enable --now dinner-deck.service`
+
+To pick up code changes after a `git pull` on the Pi, run `sudo systemctl restart dinner-deck.service`.
 
 The PWA service worker caches the app shell and the latest plan/grocery-list API responses, so the phone can still show the current week's grocery list even if it can't reach the Pi (e.g. you're on cellular at the store, off your home WiFi).
 

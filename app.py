@@ -1,3 +1,4 @@
+import os
 import random
 from datetime import date, timedelta
 
@@ -301,4 +302,6 @@ def _grocery_list_to_dict(grocery_list):
 app = create_app()
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5050, debug=True)
+    host = os.environ.get("FLASK_HOST", "0.0.0.0")
+    debug = os.environ.get("FLASK_DEBUG", "false").lower() == "true"
+    app.run(host=host, port=5050, debug=debug)
