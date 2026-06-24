@@ -12,22 +12,21 @@
 </head>
 <body>
   <header>
-    <h1>🍽️ Dinner Deck</h1>
-    <nav>
-      <button class="tab-btn active" data-tab="plan">This Week</button>
-      <button class="tab-btn" data-tab="recipes">Recipes</button>
-      <button class="tab-btn" data-tab="grocery">Grocery List</button>
-    </nav>
+    <div class="header-inner">
+      <span class="logo-mark">🍽️</span>
+      <h1>Dinner Deck</h1>
+    </div>
   </header>
 
   <main>
     <!-- PLAN TAB -->
     <section id="tab-plan" class="tab active">
-      <div class="card">
-        <h2>Generate This Week's Plan (Mon–Fri)</h2>
-        <label>Exclude tags (comma-separated, e.g. shrimp, shellfish)</label>
+      <div class="card hero-card">
+        <h2>This Week's Plan</h2>
+        <p class="muted">Monday through Friday, picked from your recipe pool.</p>
+        <label>Exclude tags (comma-separated)</label>
         <input type="text" id="exclude-tags-input" placeholder="shrimp, shellfish, peanuts">
-        <button id="generate-plan-btn">Shuffle the Deck</button>
+        <button id="generate-plan-btn" class="btn-primary">🔀 Shuffle the Deck</button>
       </div>
 
       <div id="plan-meals"></div>
@@ -56,14 +55,14 @@
 
           <label>Ingredients</label>
           <div id="ingredient-rows"></div>
-          <button type="button" id="add-ingredient-row">+ Add Ingredient</button>
+          <button type="button" id="add-ingredient-row" class="btn-secondary btn-small">+ Add Ingredient</button>
 
           <label>Instructions</label>
           <textarea id="recipe-instructions" rows="4" placeholder="1. ...&#10;2. ..."></textarea>
 
           <div class="form-actions">
-            <button type="submit">Save Recipe</button>
-            <button type="button" id="cancel-edit-btn" style="display:none;">Cancel</button>
+            <button type="submit" class="btn-primary">Save Recipe</button>
+            <button type="button" id="cancel-edit-btn" class="btn-secondary" style="display:none;">Cancel</button>
           </div>
         </form>
       </div>
@@ -79,14 +78,29 @@
 
     <!-- GROCERY TAB -->
     <section id="tab-grocery" class="tab">
-      <div class="card">
+      <div class="card hero-card">
         <h2>Grocery List</h2>
-        <button id="generate-grocery-btn">Generate from This Week's Plan</button>
-        <p class="muted">Generate while on WiFi at home — the list is cached for offline use at the store.</p>
+        <p class="muted">Generate while on WiFi at home — it's cached for offline use at the store.</p>
+        <button id="generate-grocery-btn" class="btn-primary">🛒 Generate from This Week's Plan</button>
       </div>
       <div id="grocery-items"></div>
     </section>
   </main>
+
+  <nav class="bottom-nav">
+    <button class="tab-btn active" data-tab="plan">
+      <span class="tab-icon">📅</span>
+      <span class="tab-label">This Week</span>
+    </button>
+    <button class="tab-btn" data-tab="recipes">
+      <span class="tab-icon">📖</span>
+      <span class="tab-label">Recipes</span>
+    </button>
+    <button class="tab-btn" data-tab="grocery">
+      <span class="tab-icon">🛒</span>
+      <span class="tab-label">Grocery</span>
+    </button>
+  </nav>
 
   <script src="/static/js/app.js"></script>
 </body>
