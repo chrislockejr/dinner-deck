@@ -1,8 +1,11 @@
+const DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
+
 const state = {
   recipes: [],
   currentPlan: null,
   editingRecipeId: null,
   expandedMealIds: new Set(),
+  swappingMealKey: null,
 };
 
 // ---- Tab navigation ----
@@ -172,6 +175,13 @@ document.getElementById("recipe-search").addEventListener("input", renderRecipeL
 
 // ---- Weekly plan ----
 document.getElementById("generate-plan-btn").addEventListener("click", async () => {
+  if (state.currentPlan && state.currentPlan.meals.length > 0) {
+    const confirmed = confirm(
+      "This will replace your current plan with a new shuffle. Your old plan stays in history and can be restored, but continue?"
+    );
+    if (!confirmed) return;
+  }
+
   const excludeTags = document.getElementById("exclude-tags-input").value
     .split(",")
     .map((t) => t.trim().toLowerCase())
@@ -190,7 +200,10 @@ document.getElementById("generate-plan-btn").addEventListener("click", async () 
   }
 
   state.currentPlan = await res.json();
+  state.expandedMealIds.clear();
+  state.swappingMealKey = null;
   renderPlan();
+  loadPlanHistory();
 });
 
 async function loadLatestPlan() {
@@ -202,14 +215,81 @@ async function loadLatestPlan() {
   }
 }
 
+async function refreshCurrentPlan() {
+  const res = await fetch(`/api/plans/${state.currentPlan.id}`);
+  state.currentPlan = await res.json();
+  renderPlan();
+}
+
+async function swapMealRecipe(dayOfWeek, meal, newRecipeId) {
+  if (meal) {
+    await fetch(`/api/plans/${state.currentPlan.id}/meals/${meal.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ recipe_id: parseInt(newRecipeId, 10) }),
+    });
+  } else {
+    await fetch(`/api/plans/${state.currentPlan.id}/meals`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ day_of_week: dayOfWeek, recipe_id: parseInt(newRecipeId, 10) }),
+    });
+  }
+  state.swappingMealKey = null;
+  await refreshCurrentPlan();
+}
+
+function buildRecipePicker(dayOfWeek, meal, usedRecipeIds) {
+  const select = document.createElement("select");
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.textContent = "Choose a recipe...";
+  select.appendChild(placeholder);
+
+  state.recipes
+    .slice()
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .forEach((recipe) => {
+      const option = document.createElement("option");
+      option.value = recipe.id;
+      const inUseElsewhere = usedRecipeIds.has(recipe.id) && (!meal || meal.recipe.id !== recipe.id);
+      option.textContent = `${recipe.name} (${recipe.cuisine_type})${inUseElsewhere ? " — already this week" : ""}`;
+      select.appendChild(option);
+    });
+
+  select.addEventListener("change", () => {
+    if (select.value) swapMealRecipe(dayOfWeek, meal, select.value);
+  });
+  return select;
+}
+
 function renderPlan() {
   const container = document.getElementById("plan-meals");
   container.innerHTML = "";
 
   if (!state.currentPlan) return;
 
+  const mealsByDay = {};
   state.currentPlan.meals.forEach((meal) => {
+    mealsByDay[meal.day_of_week] = meal;
+  });
+  const usedRecipeIds = new Set(state.currentPlan.meals.map((m) => m.recipe.id));
+
+  DAY_NAMES.forEach((dayName, dayOfWeek) => {
+    const meal = mealsByDay[dayOfWeek];
+    const card = document.createElement("div");
+    card.className = "meal-card";
+
+    if (!meal) {
+      card.innerHTML = `<div class="day">${dayName}</div><p class="muted">No meal picked for this day yet.</p><div class="swap-picker"></div>`;
+      card.querySelector(".swap-picker").appendChild(buildRecipePicker(dayOfWeek, null, usedRecipeIds));
+      container.appendChild(card);
+      return;
+    }
+
+    const mealKey = `${dayOfWeek}`;
     const isExpanded = state.expandedMealIds.has(meal.id);
+    const isSwapping = state.swappingMealKey === mealKey;
     const ingredientsHtml = meal.recipe.ingredients
       .map((i) => `<li>${i.amount} ${i.unit} ${i.ingredient}</li>`)
       .join("");
@@ -219,12 +299,10 @@ function renderPlan() {
       .map((line) => `<p>${line}</p>`)
       .join("");
 
-    const card = document.createElement("div");
-    card.className = "meal-card";
     card.innerHTML = `
       <div class="meal-summary">
         <div>
-          <div class="day">${meal.day_name}</div>
+          <div class="day">${dayName}</div>
           <h3>${meal.recipe.name}</h3>
           <div class="meta">${meal.recipe.cuisine_type} · ${meal.recipe.cook_time_minutes} min</div>
           <div class="servings-control">
@@ -232,7 +310,10 @@ function renderPlan() {
             <input type="number" class="servings-input" min="1" value="${meal.servings}">
           </div>
         </div>
-        <button class="view">${isExpanded ? "Hide" : "View"}</button>
+        <div class="meal-actions">
+          <button class="view">${isExpanded ? "Hide" : "View"}</button>
+          <button class="swap">${isSwapping ? "Cancel" : "Swap"}</button>
+        </div>
       </div>
       <div class="recipe-detail" style="display:${isExpanded ? "block" : "none"};">
         <h4>Ingredients</h4>
@@ -240,6 +321,7 @@ function renderPlan() {
         <h4>Instructions</h4>
         ${instructionsHtml || "<p class='muted'>No instructions added.</p>"}
       </div>
+      <div class="swap-picker" style="display:${isSwapping ? "block" : "none"};"></div>
     `;
     card.querySelector(".view").addEventListener("click", (e) => {
       const detail = card.querySelector(".recipe-detail");
@@ -252,6 +334,14 @@ function renderPlan() {
         state.expandedMealIds.delete(meal.id);
       }
     });
+    card.querySelector(".swap").addEventListener("click", (e) => {
+      state.swappingMealKey = isSwapping ? null : mealKey;
+      renderPlan();
+    });
+    if (isSwapping) {
+      const pickerContainer = card.querySelector(".swap-picker");
+      pickerContainer.appendChild(buildRecipePicker(dayOfWeek, meal, usedRecipeIds));
+    }
     card.querySelector(".servings-input").addEventListener("change", async (e) => {
       const newServings = parseInt(e.target.value, 10);
       await fetch(`/api/plans/${state.currentPlan.id}/meals/${meal.id}`, {
@@ -259,12 +349,69 @@ function renderPlan() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ servings_override: newServings }),
       });
-      const res = await fetch(`/api/plans/${state.currentPlan.id}`);
-      state.currentPlan = await res.json();
-      renderPlan();
+      await refreshCurrentPlan();
     });
     container.appendChild(card);
   });
+}
+
+// ---- Plan history / rollback ----
+document.getElementById("toggle-history-btn").addEventListener("click", async () => {
+  const panel = document.getElementById("plan-history");
+  const showing = panel.style.display === "none";
+  panel.style.display = showing ? "block" : "none";
+  if (showing) await loadPlanHistory();
+});
+
+async function loadPlanHistory() {
+  const res = await fetch("/api/plans/history?limit=10");
+  const plans = await res.json();
+  renderPlanHistory(plans);
+}
+
+function renderPlanHistory(plans) {
+  const panel = document.getElementById("plan-history");
+  panel.innerHTML = "";
+
+  if (plans.length === 0) {
+    panel.innerHTML = "<p class='muted'>No past plans yet.</p>";
+    return;
+  }
+
+  const ul = document.createElement("ul");
+  ul.className = "history-list";
+  plans.forEach((plan) => {
+    const li = document.createElement("li");
+    const when = new Date(plan.created_at).toLocaleString([], {
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
+    li.innerHTML = `
+      <div>
+        <div class="history-meta">${when}${plan.active ? " · <strong>current</strong>" : ""}</div>
+        <div class="history-recipes">${plan.recipe_names.join(", ") || "(empty)"}</div>
+      </div>
+    `;
+    if (!plan.active) {
+      const restoreBtn = document.createElement("button");
+      restoreBtn.textContent = "Restore";
+      restoreBtn.className = "btn-secondary btn-small";
+      restoreBtn.addEventListener("click", async () => {
+        if (!confirm("Restore this plan as the current week's plan?")) return;
+        const res = await fetch(`/api/plans/${plan.id}/activate`, { method: "POST" });
+        state.currentPlan = await res.json();
+        state.expandedMealIds.clear();
+        state.swappingMealKey = null;
+        renderPlan();
+        await loadPlanHistory();
+      });
+      li.appendChild(restoreBtn);
+    }
+    ul.appendChild(li);
+  });
+  panel.appendChild(ul);
 }
 
 // ---- Grocery list ----

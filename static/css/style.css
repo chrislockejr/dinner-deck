@@ -422,7 +422,14 @@ button:not([class*="btn-"]):not(.tab-btn):not(.remove-row) {
   gap: 0.6rem;
 }
 
-.meal-summary .view {
+.meal-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  flex: 0 0 auto;
+}
+
+.meal-actions button {
   flex: 0 0 auto;
   background: var(--green-light);
   color: var(--green-dark);
@@ -431,10 +438,62 @@ button:not([class*="btn-"]):not(.tab-btn):not(.remove-row) {
   margin-top: 0;
 }
 
+.meal-actions button.swap {
+  background: #eef0f2;
+  color: var(--ink);
+}
+
 .meal-card .recipe-detail {
   margin: 0.6rem -1rem -0.85rem;
   padding: 0.7rem 1rem 0.85rem;
   border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+}
+
+.swap-picker {
+  margin-top: 0.6rem;
+}
+
+.swap-picker select {
+  width: 100%;
+  padding: 0.55rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 0.9rem;
+  background: #fbfcfd;
+}
+
+.history-list {
+  list-style: none;
+  padding: 0;
+  margin: 0.6rem 0 0;
+}
+
+.history-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.history-list li:last-child {
+  border-bottom: none;
+}
+
+.history-meta {
+  font-size: 0.75rem;
+  color: var(--gray);
+}
+
+.history-recipes {
+  font-size: 0.85rem;
+  margin-top: 0.1rem;
+}
+
+.history-list button {
+  flex: 0 0 auto;
+  margin-top: 0;
 }
 
 .servings-control {

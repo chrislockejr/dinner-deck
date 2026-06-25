@@ -101,6 +101,16 @@ def register_routes(app):
     @app.route("/api/recipes/<int:recipe_id>", methods=["DELETE"])
     def delete_recipe(recipe_id):
         recipe = Recipe.query.get_or_404(recipe_id)
+
+        affected_meals = WeeklyPlanMeal.query.filter_by(recipe_id=recipe_id).all()
+        affected_plan_ids = {m.weekly_plan_id for m in affected_meals}
+        for meal in affected_meals:
+            db.session.delete(meal)
+        for plan_id in affected_plan_ids:
+            plan = db.session.get(WeeklyPlan, plan_id)
+            if plan and plan.grocery_list:
+                db.session.delete(plan.grocery_list)
+
         db.session.delete(recipe)
         db.session.commit()
         return "", 204
@@ -134,6 +144,7 @@ def register_routes(app):
                 WeeklyPlanMeal(weekly_plan_id=plan.id, recipe_id=recipe.id, day_of_week=day_of_week)
             )
 
+        _activate_plan(plan)
         db.session.commit()
         return jsonify(_plan_to_dict(plan)), 201
 
@@ -144,9 +155,22 @@ def register_routes(app):
 
     @app.route("/api/plans/latest", methods=["GET"])
     def latest_plan():
-        plan = WeeklyPlan.query.order_by(WeeklyPlan.created_at.desc()).first()
+        plan = WeeklyPlan.query.filter_by(active=True).order_by(WeeklyPlan.created_at.desc()).first()
         if not plan:
             return jsonify(None)
+        return jsonify(_plan_to_dict(plan))
+
+    @app.route("/api/plans/history", methods=["GET"])
+    def plan_history():
+        limit = request.args.get("limit", 10, type=int)
+        plans = WeeklyPlan.query.order_by(WeeklyPlan.created_at.desc()).limit(limit).all()
+        return jsonify([_plan_summary_to_dict(p) for p in plans])
+
+    @app.route("/api/plans/<int:plan_id>/activate", methods=["POST"])
+    def activate_plan(plan_id):
+        plan = WeeklyPlan.query.get_or_404(plan_id)
+        _activate_plan(plan)
+        db.session.commit()
         return jsonify(_plan_to_dict(plan))
 
     @app.route("/api/plans/<int:plan_id>/meals/<int:meal_id>", methods=["PUT"])
@@ -155,10 +179,32 @@ def register_routes(app):
         data = request.get_json()
         if "recipe_id" in data:
             meal.recipe_id = data["recipe_id"]
+            if "servings_override" not in data:
+                meal.servings_override = None
         if "servings_override" in data:
             meal.servings_override = data["servings_override"]
+        _invalidate_grocery_list(meal.weekly_plan_id)
         db.session.commit()
         return jsonify(_meal_to_dict(meal))
+
+    @app.route("/api/plans/<int:plan_id>/meals", methods=["POST"])
+    def set_plan_meal(plan_id):
+        plan = WeeklyPlan.query.get_or_404(plan_id)
+        data = request.get_json()
+        day_of_week = data["day_of_week"]
+        recipe_id = data["recipe_id"]
+
+        meal = WeeklyPlanMeal.query.filter_by(weekly_plan_id=plan.id, day_of_week=day_of_week).first()
+        if meal:
+            meal.recipe_id = recipe_id
+            meal.servings_override = None
+        else:
+            meal = WeeklyPlanMeal(weekly_plan_id=plan.id, recipe_id=recipe_id, day_of_week=day_of_week)
+            db.session.add(meal)
+
+        _invalidate_grocery_list(plan.id)
+        db.session.commit()
+        return jsonify(_meal_to_dict(meal)), 201
 
     # ---- Grocery list ----
     @app.route("/api/plans/<int:plan_id>/grocery-list", methods=["POST"])
@@ -205,6 +251,17 @@ def register_routes(app):
 def _next_monday():
     today = date.today()
     return today + timedelta(days=(7 - today.weekday()) % 7 or 7)
+
+
+def _activate_plan(plan):
+    WeeklyPlan.query.filter(WeeklyPlan.id != plan.id).update({"active": False})
+    plan.active = True
+
+
+def _invalidate_grocery_list(plan_id):
+    plan = db.session.get(WeeklyPlan, plan_id)
+    if plan and plan.grocery_list:
+        db.session.delete(plan.grocery_list)
 
 
 def _build_recipe_from_payload(data):
@@ -265,8 +322,19 @@ def _plan_to_dict(plan):
     return {
         "id": plan.id,
         "week_start_date": plan.week_start_date.isoformat(),
+        "active": plan.active,
         "meals": [_meal_to_dict(m) for m in plan.meals],
         "grocery_list_id": plan.grocery_list.id if plan.grocery_list else None,
+    }
+
+
+def _plan_summary_to_dict(plan):
+    return {
+        "id": plan.id,
+        "week_start_date": plan.week_start_date.isoformat(),
+        "created_at": plan.created_at.isoformat(),
+        "active": plan.active,
+        "recipe_names": [m.recipe.name for m in plan.meals if m.recipe is not None],
     }
 
 

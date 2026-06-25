@@ -91,6 +91,7 @@ class WeeklyPlan(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     week_start_date = db.Column(db.Date, nullable=False, default=date.today)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    active = db.Column(db.Boolean, nullable=False, default=True)
 
     meals = db.relationship(
         "WeeklyPlanMeal", backref="plan", cascade="all, delete-orphan",
